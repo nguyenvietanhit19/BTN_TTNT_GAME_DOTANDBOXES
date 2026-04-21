@@ -2,8 +2,8 @@
 import pygame
 
 # ─── CỬA SỔ ───────────────────────────────────────────────────────────────────
-WINDOW_WIDTH  = 900
-WINDOW_HEIGHT = 700
+WINDOW_WIDTH  = 980
+WINDOW_HEIGHT = 820
 FPS           = 60
 TITLE         = "Dots & Boxes"
 

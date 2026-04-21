@@ -101,7 +101,7 @@ class SplashScreen:
         self.gm   = gm
         self.tick = 0.0
         self._btn = Button(
-            WINDOW_WIDTH//2 - 120, WINDOW_HEIGHT//2 + 60,
+            WINDOW_WIDTH//2 - 120, WINDOW_HEIGHT//2 + 100,
             240, 60, "PLAY",
             color=C_SURFACE2, hover_color=C_ACCENT,
             font_size=FONT_LARGE_SIZE, radius=30
@@ -159,8 +159,8 @@ class SplashScreen:
                          cx, cy + 42)
 
         # Subtitle
-        draw_text_center(surf, "Trí Tuệ Nhân Tạo — Nhóm ...",
-                         self._f_sub, C_TEXT_DIM, cx, cy + 105)
+        draw_text_center(surf, "Trí Tuệ Nhân Tạo — Nhóm 10",
+                         self._f_sub, C_TEXT_DIM, cx, cy + 122)
 
         self._btn.draw(surf)
 
@@ -175,17 +175,18 @@ class ContinueOrNewScreen:
     def __init__(self, gm: GameManager):
         self.gm  = gm
         cx       = WINDOW_WIDTH // 2
-        self._btn_continue = Button(cx-140, 320, 280, 60, "Chơi tiếp",
+        self._btn_continue = Button(cx-140, 352, 280, 60, "Chơi tiếp",
                                     hover_color=C_ACCENT, font_size=FONT_MEDIUM_SIZE)
-        self._btn_new      = Button(cx-140, 410, 280, 60, "Ván mới",
+        self._btn_new      = Button(cx-140, 442, 280, 60, "Ván mới",
                                     hover_color=C_ACCENT2, font_size=FONT_MEDIUM_SIZE)
         self._f_title = _font_bold(FONT_LARGE_SIZE)
         self._f_info  = _font(FONT_SMALL_SIZE)
 
     def handle_event(self, event):
         if self._btn_continue.handle_event(event):
-            self.gm.load()
-            return "game"
+            if self.gm.load():
+                return "game"
+            return "menu"
         if self._btn_new.handle_event(event):
             return "menu"
         return None
@@ -200,14 +201,14 @@ class ContinueOrNewScreen:
         cx = WINDOW_WIDTH // 2
 
         # Panel
-        panel = pygame.Rect(cx-220, 220, 440, 300)
+        panel = pygame.Rect(cx-220, 220, 440, 320)
         draw_rect_alpha(surf, (*C_SURFACE, 230), panel, radius=20)
         pygame.draw.rect(surf, C_BORDER, panel, 2, border_radius=20)
 
         draw_text_center(surf, "Bạn có ván chơi dở!", self._f_title, C_ACCENT,
-                         cx, 280)
+                         cx, 278)
         draw_text_center(surf, "Muốn tiếp tục hay bắt đầu ván mới?",
-                         self._f_info, C_TEXT_DIM, cx, 320)
+                         self._f_info, C_TEXT_DIM, cx, 316)
 
         self._btn_continue.draw(surf)
         self._btn_new.draw(surf)
@@ -317,14 +318,17 @@ class GameScreen:
         self._hover_move = None   # move đang hover
         self._ai_thinking = False
         self._ai_move    = None   # move AI vừa tính xong
+        self._auto_next  = None
         self._flash_cells = []    # [(r,c, timer)] ô vừa chiếm → flash
         self._msg        = ""
         self._msg_timer  = 0.0
         self._f_small = _font(FONT_SMALL_SIZE)
         self._f_med   = _font(FONT_MEDIUM_SIZE)
         self._f_bold  = _font_bold(FONT_MEDIUM_SIZE)
-        self._btn_save = Button(WINDOW_WIDTH - 120, 20, 100, 36, "Lưu & Thoát",
+        self._btn_save = Button(WINDOW_WIDTH - 130, 100, 110, 36, "Lưu & Thoát",
                                 font_size=14, radius=8)
+        self._btn_continue = Button(WINDOW_WIDTH//2 - 90, WINDOW_HEIGHT - 80, 180, 44,
+                                    "Tiếp tục", hover_color=C_ACCENT, font_size=18, radius=12)
         self._board_offset = (0, 0)  # tính trong draw
 
     # ── Tính offset bàn cờ để căn giữa ────────────────────────────────────
@@ -334,7 +338,45 @@ class GameScreen:
         board_h = (b.rows - 1) * CELL_SIZE
         ox = (WINDOW_WIDTH  - board_w) // 2
         oy = (WINDOW_HEIGHT - board_h) // 2 + 20
+
+        # Với bàn lớn và trạng thái game over, đẩy bàn cờ lên để chừa chỗ
+        # cho panel "Kết thúc" và nút "Tiếp tục" ở phía dưới.
+        bottom_reserved = 150 if self.gm.game_over else 70
+        max_board_bottom = WINDOW_HEIGHT - bottom_reserved
+        oy = min(oy, max_board_bottom - board_h)
         return ox, oy
+
+    def _get_end_overlay_rects(self):
+        """
+        Đặt panel/nút kết thúc ra ngoài vùng bàn cờ nếu có thể.
+        """
+        _, oy = self._calc_offset()
+        board_bottom = oy + (self.gm.board.rows - 1) * CELL_SIZE
+        panel_w, panel_h = 430, 58
+        button_w, button_h = 180, 38
+        gap_from_board = 32
+        gap_panel_button = 18
+
+        panel_x = WINDOW_WIDTH // 2 - panel_w // 2
+        panel_y = min(WINDOW_HEIGHT - 118, board_bottom + gap_from_board)
+
+        button_x = WINDOW_WIDTH // 2 - button_w // 2
+        button_y = min(WINDOW_HEIGHT - 52, panel_y + panel_h + gap_panel_button)
+
+        return (
+            pygame.Rect(panel_x, panel_y, panel_w, panel_h),
+            pygame.Rect(button_x, button_y, button_w, button_h),
+        )
+
+    def _get_hud_layout(self):
+        margin = 28
+        top = 22
+        card_w, card_h = 220, 76
+        p1_rect = pygame.Rect(margin, top, card_w, card_h)
+        p2_rect = pygame.Rect(WINDOW_WIDTH - margin - card_w, top, card_w, card_h)
+        status_pos = (WINDOW_WIDTH // 2, top + 28)
+        save_rect = pygame.Rect(WINDOW_WIDTH // 2 - 65, top + 48, 130, 36)
+        return p1_rect, p2_rect, status_pos, save_rect
 
     # ── Chuyển tọa độ pixel → move ────────────────────────────────────────
     def _pixel_to_move(self, px, py):
@@ -378,29 +420,29 @@ class GameScreen:
             return "splash"
 
         if event.type == pygame.MOUSEMOTION:
-            self._hover_move = self._pixel_to_move(*event.pos)
+            self._hover_move = None if self.gm.game_over else self._pixel_to_move(*event.pos)
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.gm.game_over:
-                return "result"
+                if self._btn_continue.handle_event(event):
+                    return "result"
+                return None
             if self.gm.current_player.is_human and not self._ai_thinking:
                 move = self._pixel_to_move(*event.pos)
                 if move:
                     self._do_move(move)
-                    if self.gm.game_over:
-                        return "result"
 
         return None
 
     def _do_move(self, move):
+        prev_boxes = self.gm.board.copy_boxes()
         captured = self.gm.apply_move(move)
         if captured:
             self._flash_cells = [
                 (r, c, 0.5)
                 for r in range(self.gm.board.box_rows)
                 for c in range(self.gm.board.box_cols)
-                if self.gm.board.boxes[r][c] != 0
-                   and (r, c) not in [(x, y) for x, y, _ in self._flash_cells]
+                if prev_boxes[r][c] == 0 and self.gm.board.boxes[r][c] != 0
             ]
             self._msg       = f"+{captured} ô!"
             self._msg_timer = 1.2
@@ -410,11 +452,12 @@ class GameScreen:
     def _start_ai(self):
         self._ai_thinking = True
         depth = self.gm.ai_depth
+        difficulty = self.gm.difficulty
         board_copy = copy.deepcopy(self.gm.board)
 
         def run():
             try:
-                move = choose_move(board_copy, depth)
+                move = choose_move(board_copy, depth, difficulty)
             except Exception:
                 move = None
             self._ai_move = move if move is not None else self._AI_NO_MOVE
@@ -423,6 +466,7 @@ class GameScreen:
 
     # ── Update ────────────────────────────────────────────────────────────
     def update(self, dt):
+        self._auto_next = None
         # Flash cells
         self._flash_cells = [
             (r, c, t - dt) for r, c, t in self._flash_cells if t - dt > 0
@@ -445,8 +489,15 @@ class GameScreen:
             if move is not self._AI_NO_MOVE:
                 self._do_move(move)
 
+        _, _, _, save_rect = self._get_hud_layout()
+        self._btn_save.rect = save_rect
         self._btn_save.handle_event(
             pygame.event.Event(pygame.MOUSEMOTION, pos=pygame.mouse.get_pos()))
+        if self.gm.game_over:
+            _, button_rect = self._get_end_overlay_rects()
+            self._btn_continue.rect = button_rect
+            self._btn_continue.handle_event(
+                pygame.event.Event(pygame.MOUSEMOTION, pos=pygame.mouse.get_pos()))
 
     # ── Draw ──────────────────────────────────────────────────────────────
     def draw(self, surf):
@@ -459,43 +510,42 @@ class GameScreen:
         cur      = self.gm.current_player
         p1_bold  = (cur == p1)
         p2_bold  = (cur == p2)
+        p1_rect, p2_rect, status_pos, save_rect = self._get_hud_layout()
+        self._btn_save.rect = save_rect
 
         # P1 card
-        p1_rect = pygame.Rect(20, 20, 200, 70)
         draw_rect_alpha(surf,
                         (*C_LINE_P1, 30) if p1_bold else (*C_SURFACE, 200),
                         p1_rect, radius=12)
         if p1_bold:
             pygame.draw.rect(surf, C_LINE_P1, p1_rect, 2, border_radius=12)
-        surf.blit(self._f_bold.render(p1.name, True, C_LINE_P1), (32, 30))
-        surf.blit(self._f_med.render(str(p1.score), True, C_TEXT), (32, 55))
+        surf.blit(self._f_bold.render(p1.name, True, C_LINE_P1), (p1_rect.x + 14, p1_rect.y + 12))
+        surf.blit(self._f_med.render(str(p1.score), True, C_TEXT), (p1_rect.x + 14, p1_rect.y + 42))
 
         # P2 card
-        p2_rect = pygame.Rect(WINDOW_WIDTH-220, 20, 200, 70)
         draw_rect_alpha(surf,
                         (*C_LINE_P2, 30) if p2_bold else (*C_SURFACE, 200),
                         p2_rect, radius=12)
         if p2_bold:
             pygame.draw.rect(surf, C_LINE_P2, p2_rect, 2, border_radius=12)
         surf.blit(self._f_bold.render(p2.name, True, C_LINE_P2),
-                  (WINDOW_WIDTH-208, 30))
+                  (p2_rect.x + 14, p2_rect.y + 12))
         surf.blit(self._f_med.render(str(p2.score), True, C_TEXT),
-                  (WINDOW_WIDTH-208, 55))
+                  (p2_rect.x + 14, p2_rect.y + 42))
 
         # Lượt / AI thinking
         if self._ai_thinking:
             status = "Máy đang suy nghĩ..."
         else:
             status = f"Lượt: {cur.name}"
-        draw_text_center(surf, status, self._f_small, C_TEXT_DIM,
-                         WINDOW_WIDTH//2, 45)
+        draw_text_center(surf, status, self._f_small, C_TEXT_DIM, *status_pos)
 
         # Thông báo +ô
         if self._msg_timer > 0:
             alpha = int(255 * min(1.0, self._msg_timer))
             ms    = self._f_bold.render(self._msg, True, C_SUCCESS)
             ms.set_alpha(alpha)
-            surf.blit(ms, (WINDOW_WIDTH//2 - ms.get_width()//2, 65))
+            surf.blit(ms, (WINDOW_WIDTH//2 - ms.get_width()//2, status_pos[1] + 18))
 
         # ── Ô (box fill) ───────────────────────────────────────────────
         for r in range(b.box_rows):
@@ -566,6 +616,20 @@ class GameScreen:
                 pygame.draw.circle(surf, col, (x, y), DOT_RADIUS)
 
         self._btn_save.draw(surf)
+        if self.gm.game_over:
+            winner = self.gm.get_winner()
+            panel, button_rect = self._get_end_overlay_rects()
+            self._btn_continue.rect = button_rect
+            draw_rect_alpha(surf, (*C_SURFACE, 235), panel, radius=16)
+            pygame.draw.rect(surf, C_BORDER, panel, 2, border_radius=16)
+            if winner:
+                end_text = f"Kết thúc: {winner.name} thắng"
+            else:
+                end_text = "Kết thúc: Hòa"
+            draw_text_center(surf, end_text, self._f_bold, C_TEXT, panel.centerx, panel.y + 18)
+            draw_text_center(surf, "Xem lại bàn cờ rồi bấm tiếp tục", self._f_small,
+                             C_TEXT_DIM, panel.centerx, panel.y + 46)
+            self._btn_continue.draw(surf)
 
     def _hover_near_dot(self, dx, dy) -> bool:
         if self._hover_move is None:

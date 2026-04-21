@@ -1,4 +1,3 @@
-# ai/minimax.py
 """
 AI 3 tầng cho Dots and Boxes:
   Tầng 1 — Greedy      : chiếm ngay ô 3 cạnh nếu có
@@ -7,18 +6,15 @@ AI 3 tầng cho Dots and Boxes:
 """
 import math
 import random
+
 from board import Board
 
 
-AI_ID     = 2
-HUMAN_ID  = 1
+AI_ID = 2
+HUMAN_ID = 1
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Hàm công khai: chọn nước đi cho AI
-# ══════════════════════════════════════════════════════════════════════════════
-
-def choose_move(board: Board, depth: int):
+def choose_move(board: Board, depth: int, difficulty: str = "Hard"):
     """
     Trả về move tốt nhất cho AI (player_id = 2).
     depth: độ sâu Minimax (từ config).
@@ -27,66 +23,81 @@ def choose_move(board: Board, depth: int):
     if not moves:
         return None
 
-    # Adaptive depth: giảm độ sâu khi còn nhiều nước để tránh timeout
     n = len(moves)
     if n > 20:
         depth = min(depth, 3)
     elif n > 12:
         depth = min(depth, 5)
 
-    # ── Tầng 1: Greedy ─────────────────────────────────────────────────────
     greedy = _greedy_move(board)
     if greedy:
         return greedy
 
-    # ── Tầng 2: Chain Analysis / Double-cross ──────────────────────────────
+    if difficulty == "Easy":
+        return _easy_move(board)
+
     chain_move = _chain_move(board)
     if chain_move:
         return chain_move
 
-    # ── Tầng 3: Minimax + Alpha-Beta ───────────────────────────────────────
-    best_move  = None
-    best_score = -math.inf
-    alpha, beta = -math.inf, math.inf
-
-    # Sắp xếp ưu tiên: tránh đưa ô 2 cạnh → 3 cạnh trước
     ordered = _order_moves(board, moves)
+    scored_moves = []
+    alpha, beta = -math.inf, math.inf
 
     for move in ordered:
         prev_boxes = board.copy_boxes()
-        captured   = board.apply_move(move, AI_ID)
-        # Nếu AI vừa chiếm ô → vẫn là lượt AI
+        captured = board.apply_move(move, AI_ID)
         next_is_max = captured > 0
         score = _minimax(board, depth - 1, alpha, beta, next_is_max)
         board.undo_move(move, prev_boxes)
+        scored_moves.append((move, score))
+        alpha = max(alpha, score)
 
-        if score > best_score:
-            best_score = score
-            best_move  = move
-        alpha = max(alpha, best_score)
+    if not scored_moves:
+        return random.choice(moves)
 
-    return best_move
+    best_score = max(score for _, score in scored_moves)
+    best_moves = [move for move, score in scored_moves if score == best_score]
 
+    if difficulty == "Hard":
+        return random.choice(best_moves)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Tầng 1 — Greedy
-# ══════════════════════════════════════════════════════════════════════════════
+    return _medium_like_random_choice(scored_moves)
+
 
 def _greedy_move(board: Board):
     """Trả về move chiếm ô có 3 cạnh (nếu có), ngẫu nhiên trong số đó."""
-    safe = []
+    greedy_moves = []
     for move in board.available_moves():
         prev = board.copy_boxes()
         captured = board.apply_move(move, AI_ID)
         board.undo_move(move, prev)
         if captured > 0:
-            safe.append(move)
-    return random.choice(safe) if safe else None
+            greedy_moves.append(move)
+    return random.choice(greedy_moves) if greedy_moves else None
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Tầng 2 — Chain Analysis & Double-cross
-# ══════════════════════════════════════════════════════════════════════════════
+def _easy_move(board: Board):
+    """
+    Easy: đánh ngẫu nhiên nhiều hơn.
+    Ưu tiên giữ được nước ăn ô, còn lại chọn ngẫu nhiên trong nhóm an toàn nếu có.
+    """
+    moves = board.available_moves()
+    safe_moves = [move for move in moves if not _gives_opponent_box(board, move)]
+    if safe_moves:
+        return random.choice(safe_moves)
+    return random.choice(moves)
+
+
+def _medium_like_random_choice(scored_moves):
+    """
+    Chọn ngẫu nhiên trong nhóm nước đi gần tốt nhất để AI không bị quá cứng.
+    """
+    scored_moves.sort(key=lambda item: item[1], reverse=True)
+    top_count = min(3, len(scored_moves))
+    candidate_pool = [move for move, _ in scored_moves[:top_count]]
+    return random.choice(candidate_pool)
+
 
 def _chain_move(board: Board):
     """
@@ -102,49 +113,47 @@ def _chain_move(board: Board):
     if not long_chains:
         return None
 
-    total_remaining_chains = len(chains)
-    if total_remaining_chains > 2:
+    if len(chains) > 2:
         return None
 
-    ai_score    = board.score(AI_ID)
+    ai_score = board.score(AI_ID)
     human_score = board.score(HUMAN_ID)
-    total       = board.total_boxes()
+    total = board.total_boxes()
+    chain = long_chains[0]
 
-    chain = long_chains[0]  # xử lý chuỗi đầu tiên
-
-    # Ước tính: nếu AI ăn hết chuỗi
-    sim_eat_all   = ai_score + len(chain)
-    # Nếu để lại 2 (Double-cross): đối thủ buộc lấy 2, AI lấy phần còn lại
+    sim_eat_all = ai_score + len(chain)
     remaining_after = total - ai_score - human_score - len(chain)
     sim_double_cross = ai_score + (len(chain) - 2) + remaining_after
 
-    ai_wins_eat       = sim_eat_all       > total / 2
+    ai_wins_eat = sim_eat_all > total / 2
     ai_wins_doublecross = sim_double_cross > total / 2
 
     if ai_wins_eat and ai_wins_doublecross:
-        # Double-cross: kẻ cạnh mở đầu chuỗi (để lại 2 ô cuối cho đối thủ)
         opening_move = _find_chain_opening(board, chain)
         if opening_move:
             return opening_move
 
-    # Fallback: an toàn, tránh kẻ cạnh thứ 3 vào ô
     return _safe_move(board)
 
 
 def _find_chain_opening(board: Board, chain):
-    """Tìm cạnh mở đầu chuỗi (cạnh chưa kẻ duy nhất của ô đầu chuỗi)."""
+    """Tìm cạnh mở ở đầu chuỗi."""
     r, c = chain[0]
     candidates = []
-    if not board.is_h_line_set(r, c):     candidates.append(('h', r, c))
-    if not board.is_h_line_set(r+1, c):   candidates.append(('h', r+1, c))
-    if not board.is_v_line_set(r, c):     candidates.append(('v', r, c))
-    if not board.is_v_line_set(r, c+1):   candidates.append(('v', r, c+1))
+    if not board.is_h_line_set(r, c):
+        candidates.append(("h", r, c))
+    if not board.is_h_line_set(r + 1, c):
+        candidates.append(("h", r + 1, c))
+    if not board.is_v_line_set(r, c):
+        candidates.append(("v", r, c))
+    if not board.is_v_line_set(r, c + 1):
+        candidates.append(("v", r, c + 1))
     return candidates[0] if candidates else None
 
 
 def _safe_move(board: Board):
     """
-    Trả về move 'an toàn' nhất: ưu tiên cạnh không tạo ô 3-sided cho đối thủ.
+    Trả về move an toàn nhất: ưu tiên cạnh không tạo ô 3-sided mới cho đối thủ.
     """
     moves = board.available_moves()
     safe = []
@@ -153,40 +162,37 @@ def _safe_move(board: Board):
             safe.append(move)
     if safe:
         return random.choice(safe)
-    # Không có move an toàn → chọn move ít tệ nhất
     return min(moves, key=lambda m: _danger_score(board, m))
 
 
-def _gives_opponent_box(board: Board, move) -> bool:
-    """Move này có tạo ô 3-cạnh cho đối thủ không?"""
-    prev = board.copy_boxes()
-    board.apply_move(move, AI_ID)
-    # Sau khi kẻ cạnh, kiểm tra có ô nào còn 3 cạnh không
-    danger = any(
-        board.boxes[r][c] == 0 and board.count_box_sides(r, c) == 3
+def _three_sided_boxes(board: Board):
+    return {
+        (r, c)
         for r in range(board.box_rows)
         for c in range(board.box_cols)
-    )
+        if board.boxes[r][c] == 0 and board.count_box_sides(r, c) == 3
+    }
+
+
+def _gives_opponent_box(board: Board, move) -> bool:
+    """Move này có tạo thêm ô 3-cạnh mới cho đối thủ không?"""
+    before = _three_sided_boxes(board)
+    prev = board.copy_boxes()
+    board.apply_move(move, AI_ID)
+    after = _three_sided_boxes(board)
     board.undo_move(move, prev)
-    return danger
+    return len(after - before) > 0
 
 
 def _danger_score(board: Board, move) -> int:
     """Đếm số ô 3-sided mới tạo ra sau move."""
+    before = _three_sided_boxes(board)
     prev = board.copy_boxes()
     board.apply_move(move, AI_ID)
-    count = sum(
-        1 for r in range(board.box_rows)
-        for c in range(board.box_cols)
-        if board.boxes[r][c] == 0 and board.count_box_sides(r, c) == 3
-    )
+    after = _three_sided_boxes(board)
     board.undo_move(move, prev)
-    return count
+    return len(after - before)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Tầng 3 — Minimax + Alpha-Beta
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _minimax(board: Board, depth: int, alpha: float, beta: float,
              is_maximizing: bool) -> float:
@@ -205,82 +211,65 @@ def _minimax(board: Board, depth: int, alpha: float, beta: float,
         for move in ordered:
             prev = board.copy_boxes()
             captured = board.apply_move(move, player_id)
-            # Chiếm được ô → vẫn là lượt MAX
             next_max = captured > 0
             value = max(value, _minimax(board, depth - 1, alpha, beta, next_max))
             board.undo_move(move, prev)
             alpha = max(alpha, value)
             if alpha >= beta:
-                break  # pruning
+                break
         return value
-    else:
-        value = math.inf
-        for move in ordered:
-            prev = board.copy_boxes()
-            captured = board.apply_move(move, player_id)
-            next_max = not (captured > 0)  # nếu MIN chiếm được ô → MIN tiếp tục
-            if captured > 0:
-                next_max = False  # MIN tiếp tục
-            else:
-                next_max = True   # chuyển sang MAX
-            value = min(value, _minimax(board, depth - 1, alpha, beta, next_max))
-            board.undo_move(move, prev)
-            beta = min(beta, value)
-            if alpha >= beta:
-                break  # pruning
-        return value
+
+    value = math.inf
+    for move in ordered:
+        prev = board.copy_boxes()
+        captured = board.apply_move(move, player_id)
+        next_max = captured == 0
+        value = min(value, _minimax(board, depth - 1, alpha, beta, next_max))
+        board.undo_move(move, prev)
+        beta = min(beta, value)
+        if alpha >= beta:
+            break
+    return value
 
 
 def _evaluate(board: Board) -> float:
     """
     Hàm đánh giá heuristic:
       - Điểm cơ bản: hiệu số điểm AI - người
-      - Bonus: số ô 3-sided của AI (sắp chiếm được)
-      - Penalty: số ô 3-sided của đối thủ (AI sắp để lộ)
-      - Chain heuristic: chuỗi dài có lợi cho AI
+      - Bonus: số ô 3-sided
+      - Chain heuristic: ưu tiên chuỗi dài
     """
-    ai_score    = board.score(AI_ID)
+    ai_score = board.score(AI_ID)
     human_score = board.score(HUMAN_ID)
     base = (ai_score - human_score) * 10
 
-    # Ô sắp chiếm được
-    three_sided = [
-        (r, c)
-        for r in range(board.box_rows)
-        for c in range(board.box_cols)
-        if board.boxes[r][c] == 0 and board.count_box_sides(r, c) == 3
-    ]
-    # Nếu đang lượt AI → 3-sided là lợi thế
+    three_sided = _three_sided_boxes(board)
     chain_bonus = len(three_sided) * 2
 
-    # Chain heuristic: ưu tiên chuỗi dài
     chains = board.get_chains()
     chain_value = 0
     for ch in chains:
         if len(ch) >= 3:
-            chain_value += len(ch)  # AI có thể khai thác chuỗi dài
+            chain_value += len(ch)
         elif len(ch) == 1:
-            chain_value -= 1  # chuỗi ngắn ít lợi thế hơn
+            chain_value -= 1
 
     return base + chain_bonus + chain_value
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Tiện ích
-# ══════════════════════════════════════════════════════════════════════════════
-
 def _order_moves(board: Board, moves):
     """
     Sắp xếp move: ưu tiên move chiếm ô ngay, sau đó move an toàn,
-    cuối cùng move tạo ô 3-sided cho đối thủ.
+    cuối cùng move tạo ô 3-sided mới cho đối thủ.
     """
     def priority(move):
         prev = board.copy_boxes()
         captured = board.apply_move(move, AI_ID)
         board.undo_move(move, prev)
         if captured > 0:
-            return 0   # tốt nhất: chiếm ngay
+            return 0
         if not _gives_opponent_box(board, move):
-            return 1   # an toàn
-        return 2       # nguy hiểm
+            return 1
+        return 2
+
     return sorted(moves, key=priority)
