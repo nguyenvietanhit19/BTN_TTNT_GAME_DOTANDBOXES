@@ -5,9 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="602b43ec-43e0-482a-b20f-e4a14402121d" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/ai/minimax.py" beforeDir="false" afterPath="$PROJECT_DIR$/ai/minimax.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/board.py" beforeDir="false" afterPath="$PROJECT_DIR$/board.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/screens.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/screens.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/DotAndBoxes.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/DotAndBoxes.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -21,9 +21,9 @@
     <commands />
     <urls />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 6
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
   <component name="ProjectId" id="3CfzuFmrf6jSTkTYVJn58xTO7ol" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -38,16 +38,17 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "tvt0",
+    "git-widget-placeholder": "vanh2",
     "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "D:/2026-Nam_3_Ki_II/Tri_Tue_Nhan_Tao/GAME/BTN_TTNT_GAME_DOTANDBOXES/DotAndBoxes",
+    "last_opened_file_path": "D:/kì 2 năm 3/Trí tuệ nhân tạo/BTL_GAME/BTN_TTNT_GAME_DOTANDBOXES/DotAndBoxes",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
     "to.speed.mode.migration.done": "true"
   }
 }]]></component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-f2b7a9f6281b-6e1f45a539f7-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.29346.142" />
+        <option value="bundled-python-sdk-7e47963ff851-f0eec537fc84-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.23892.515" />
       </set>
     </attachedChunks>
   </component>

@@ -533,6 +533,15 @@ class GameScreen:
         surf.blit(self._f_med.render(str(p2.score), True, C_TEXT),
                   (p2_rect.x + 14, p2_rect.y + 42))
 
+        # Hiển thị độ khó trong chế độ PvAI
+        if self.gm.mode == "PvAI":
+            diff = self.gm.difficulty
+            diff_color = C_SUCCESS if diff == "Easy" else C_ACCENT2
+            diff_label = f"{diff}"
+            diff_surf = self._f_small.render(diff_label, True, diff_color)
+            surf.blit(diff_surf, (p2_rect.right - diff_surf.get_width() - 10,
+                                  p2_rect.y + 14))
+
         # Lượt / AI thinking
         if self._ai_thinking:
             status = "Máy đang suy nghĩ..."
